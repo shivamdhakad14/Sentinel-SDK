@@ -1,0 +1,3 @@
+CREATE DATABASE IF NOT EXISTS sentinel_db;
+GRANT ALL PRIVILEGES ON sentinel_db.* TO 'sentinel'@'%';
+FLUSH PRIVILEGES;

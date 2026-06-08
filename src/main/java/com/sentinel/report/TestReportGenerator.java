@@ -242,6 +242,8 @@ public class TestReportGenerator {
     }
 
     private ChatClient clientFor(Task task) {
-        return chatClient; // AdaptiveChatClient handles model routing internally
+        return chatClient.mutate()
+            .defaultOptions(modelRouter.optionsFor(task))
+            .build();
     }
 }

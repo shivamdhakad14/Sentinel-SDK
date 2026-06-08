@@ -14,6 +14,8 @@ RUN mvn clean package -DskipTests -q
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
+RUN apk add --no-cache curl
+
 # Security: non-root user
 RUN addgroup -S sentinel && adduser -S sentinel -G sentinel
 USER sentinel

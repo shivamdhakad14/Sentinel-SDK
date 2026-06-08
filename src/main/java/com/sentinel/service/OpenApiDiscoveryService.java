@@ -30,12 +30,13 @@ public class OpenApiDiscoveryService {
     private String openApiPath;
 
     public DiscoveryResult discover(String targetBaseUrl) {
-        String specUrl = targetBaseUrl + openApiPath;
+        String normalizedBaseUrl = normalizeBaseUrl(targetBaseUrl);
+        String specUrl = normalizedBaseUrl + normalizePath(openApiPath);
         log.info("[Discovery] Fetching OpenAPI spec: {}", specUrl);
         try {
             String specJson = restClient.get().uri(specUrl).retrieve().body(String.class);
             JsonNode spec = objectMapper.readTree(specJson);
-            List<EndpointDescriptor> endpoints = parseEndpoints(spec, targetBaseUrl);
+            List<EndpointDescriptor> endpoints = parseEndpoints(spec, normalizedBaseUrl);
             log.info("[Discovery] Found {} endpoints across {} paths",
                 endpoints.size(), spec.path("paths").size());
             return new DiscoveryResult(true, endpoints, specJson, null);
@@ -58,7 +59,7 @@ public class OpenApiDiscoveryService {
             for (String method : List.of("get", "post", "put", "patch", "delete", "head", "options")) {
                 JsonNode op = pathItem.path(method);
                 if (!op.isMissingNode()) {
-                    endpoints.add(buildDescriptor(baseUrl, path, method.toUpperCase(), op, spec));
+                    endpoints.add(buildDescriptor(baseUrl, path, method.toUpperCase(), pathItem, op, spec));
                     log.debug("[Discovery]  {} {}", method.toUpperCase(), path);
                 }
             }
@@ -70,18 +71,15 @@ public class OpenApiDiscoveryService {
     }
 
     private EndpointDescriptor buildDescriptor(
-            String baseUrl, String path, String method, JsonNode op, JsonNode spec) {
+            String baseUrl, String path, String method, JsonNode pathItem, JsonNode op, JsonNode spec) {
 
         String operationId = op.path("operationId").asText(method + "_" + path.replace("/", "_").replace("{", "").replace("}", ""));
         String summary     = op.path("summary").asText("");
         String description = op.path("description").asText("");
 
         List<ParameterDescriptor> params = new ArrayList<>();
-        op.path("parameters").forEach(p -> params.add(new ParameterDescriptor(
-            p.path("name").asText(), p.path("in").asText(),
-            p.path("required").asBoolean(false),
-            p.path("schema").path("type").asText("string"),
-            p.path("description").asText(""))));
+        addParameters(params, pathItem.path("parameters"), spec);
+        addParameters(params, op.path("parameters"), spec);
 
         String requestBodySchema = null;
         JsonNode rbContent = op.path("requestBody").path("content").path("application/json");
@@ -107,7 +105,36 @@ public class OpenApiDiscoveryService {
         String[] parts = schema.get("$ref").asText().replace("#/", "").split("/");
         JsonNode node = spec;
         for (String p : parts) node = node.path(p);
-        return node;
+        return node.has("$ref") ? resolveRef(node, spec) : node;
+    }
+
+    private void addParameters(List<ParameterDescriptor> params, JsonNode source, JsonNode spec) {
+        source.forEach(raw -> {
+            JsonNode p = resolveRef(raw, spec);
+            String name = p.path("name").asText();
+            String location = p.path("in").asText();
+            boolean duplicate = params.stream()
+                .anyMatch(existing -> existing.name().equals(name) && existing.in().equals(location));
+            if (!duplicate) {
+                JsonNode schema = resolveRef(p.path("schema"), spec);
+                params.add(new ParameterDescriptor(
+                    name,
+                    location,
+                    p.path("required").asBoolean(false),
+                    schema.path("type").asText("string"),
+                    p.path("description").asText("")));
+            }
+        });
+    }
+
+    private String normalizeBaseUrl(String baseUrl) {
+        if (baseUrl == null) return "";
+        return baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+    }
+
+    private String normalizePath(String path) {
+        if (path == null || path.isBlank()) return "";
+        return path.startsWith("/") ? path : "/" + path;
     }
 
     private int methodPriority(String m) {

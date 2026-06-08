@@ -66,7 +66,8 @@ public class ModelRouter {
      */
     public OpenAiChatOptions optionsFor(Task task) {
         String model = switch (task) {
-            case PLAN, CORRECT, TEST_GEN -> planModel;
+            case PLAN, CORRECT -> planModel;
+            case TEST_GEN      -> generateModel;
             case DRIFT, HEAL             -> fallbackModel;   // simpler tasks → smaller faster model
         };
 
@@ -92,7 +93,8 @@ public class ModelRouter {
      */
     public String modelFor(Task task) {
         return switch (task) {
-            case PLAN, CORRECT, TEST_GEN -> planModel;
+            case PLAN, CORRECT -> planModel;
+            case TEST_GEN      -> generateModel;
             case DRIFT, HEAL             -> fallbackModel;
         };
     }

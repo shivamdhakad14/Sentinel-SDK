@@ -171,12 +171,12 @@ public class SentinelAgent {
             return EndpointTestResult.skipped(descriptor, skipped);
         }
 
-        String url     = resolveUrl(step.url(), context);
+        String url     = resolveUrl(step.url() != null ? step.url() : descriptor.fullUrl(), context);
         String payload = resolvePayload(step.body(), context);
         List<AgentAttempt> attempts = new ArrayList<>();
 
         for (int n = 1; n <= maxRetries; n++) {
-            HttpCallResult http = agentTools.callEndpoint(url, step.m(), payload, null);
+            HttpCallResult http = agentTools.callEndpoint(url, descriptor.method(), payload, null);
 
             AgentAttempt attempt = buildAttempt(session, step, n)
                 .requestUrl(url).requestPayload(payload)
@@ -197,10 +197,10 @@ public class SentinelAgent {
             String corrected, Map<String, Object> context, List<EndpointDescriptor> all) {
 
         EndpointDescriptor descriptor = findDescriptor(step, all);
-        String url  = resolveUrl(step.url(), context);
+        String url  = resolveUrl(step.url() != null ? step.url() : descriptor.fullUrl(), context);
         String body = resolvePayload(corrected, context);
 
-        HttpCallResult http = agentTools.callEndpoint(url, step.m(), body, null);
+        HttpCallResult http = agentTools.callEndpoint(url, descriptor.method(), body, null);
         AgentAttempt attempt = buildAttempt(session, step, 99)
             .requestUrl(url).requestPayload(body)
             .responseStatusCode(http.statusCode()).responseBody(http.responseBody())
@@ -266,7 +266,11 @@ public class SentinelAgent {
     }
 
     private AgentAttempt.AgentAttemptBuilder buildAttempt(ScanSession s, ExecutionPlan.Step step, int n) {
-        return AgentAttempt.builder().scanSession(s).httpMethod(step.m()).endpointPath(step.p()).attemptNumber(n);
+        return AgentAttempt.builder()
+            .scanSession(s)
+            .httpMethod(step.m() != null ? step.m() : "GET")
+            .endpointPath(step.p() != null ? step.p() : "/unknown")
+            .attemptNumber(n);
     }
 
     private AgentAttempt.AttemptOutcome outcome(HttpCallResult http, int n) {
@@ -281,11 +285,16 @@ public class SentinelAgent {
             .filter(e -> e.operationId().equals(step.id()) ||
                         (e.method().equals(step.m()) && e.path().equals(step.p())))
             .findFirst()
-            .orElse(new EndpointDescriptor(
-                (step.url().endsWith(step.p())
-                    ? step.url().substring(0, step.url().length() - step.p().length())
-                    : step.url()), step.p(), step.m(), step.id(),
-                "","",List.of(), step.body(), Map.of(), List.of()));
+            .orElseGet(() -> {
+                String path = step.p() != null ? step.p() : "/unknown";
+                String url = step.url() != null ? step.url() : "http://unknown" + path;
+                String base = url.endsWith(path)
+                    ? url.substring(0, url.length() - path.length())
+                    : url;
+                return new EndpointDescriptor(base, path, step.m() != null ? step.m() : "GET",
+                    step.id() != null ? step.id() : step.m() + "_" + path,
+                    "", "", List.of(), step.body(), Map.of(), List.of());
+            });
     }
 
     private ExecutionPlan.Step findStep(ExecutionPlan plan, String operationId) {

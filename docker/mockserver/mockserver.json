@@ -1,0 +1,66 @@
+[
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/v3/api-docs"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Sentinel Demo Target",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/users": {
+            "get": {
+              "operationId": "listUsers",
+              "summary": "List users",
+              "responses": {
+                "200": {
+                  "description": "Users",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "userId": { "type": "string" },
+                            "name": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/users"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": [
+        {
+          "userId": "usr_demo",
+          "name": "Demo User"
+        }
+      ]
+    }
+  }
+]

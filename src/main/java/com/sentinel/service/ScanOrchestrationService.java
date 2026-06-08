@@ -9,14 +9,16 @@ import com.sentinel.repository.*;
 import com.sentinel.service.OpenApiDiscoveryService.DiscoveryResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.Executor;
 
 /**
  * Orchestrates the full scan lifecycle.
@@ -45,21 +47,19 @@ public class ScanOrchestrationService {
     private final GeneratedTestRepository testRepository;
     private final SchemaDriftEventRepository driftRepository;
     private final SimpMessagingTemplate websocket;
-
-    @Value("${sentinel.agent.concurrent-agents:4}")
-    private int concurrentAgents;
+    @Qualifier("agentTaskExecutor")
+    private final Executor agentTaskExecutor;
 
     @Transactional
     public ScanSession startScan(String targetBaseUrl, String targetName) {
         ScanSession session = sessionRepository.save(ScanSession.builder()
             .targetBaseUrl(targetBaseUrl).targetName(targetName)
             .status(ScanSession.ScanStatus.QUEUED).build());
-        runScanAsync(session.getId(), targetBaseUrl, targetName);
+        submitAfterCommit(() -> runScan(session.getId(), targetBaseUrl, targetName));
         return session;
     }
 
-    @Async("agentTaskExecutor")
-    protected void runScanAsync(Long sessionId, String targetBaseUrl, String targetName) {
+    private void runScan(Long sessionId, String targetBaseUrl, String targetName) {
         ScanSession session = sessionRepository.findById(sessionId).orElseThrow();
 
         try {
@@ -183,5 +183,18 @@ public class ScanOrchestrationService {
             websocket.convertAndSend("/topic/scan/" + sessionId,
                 Map.of("phase", phase, "message", message, "ts", System.currentTimeMillis()));
         } catch (Exception e) { /* non-critical */ }
+    }
+
+    private void submitAfterCommit(Runnable task) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    agentTaskExecutor.execute(task);
+                }
+            });
+        } else {
+            agentTaskExecutor.execute(task);
+        }
     }
 }

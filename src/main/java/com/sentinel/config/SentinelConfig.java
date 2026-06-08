@@ -25,6 +25,9 @@ public class SentinelConfig {
     @Value("${sentinel.agent.request-timeout-seconds:30}")
     private int timeoutSeconds;
 
+    @Value("${sentinel.agent.concurrent-agents:4}")
+    private int concurrentAgents;
+
     @Bean
     public RestClient restClient() {
         var factory = new SimpleClientHttpRequestFactory();
@@ -48,8 +51,8 @@ public class SentinelConfig {
     @Bean(name = "agentTaskExecutor")
     public Executor agentTaskExecutor() {
         var exec = new ThreadPoolTaskExecutor();
-        exec.setCorePoolSize(4);
-        exec.setMaxPoolSize(10);
+        exec.setCorePoolSize(Math.max(1, concurrentAgents));
+        exec.setMaxPoolSize(Math.max(2, concurrentAgents * 2));
         exec.setQueueCapacity(50);
         exec.setThreadNamePrefix("sentinel-agent-");
         exec.initialize();

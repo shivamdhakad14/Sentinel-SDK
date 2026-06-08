@@ -4,7 +4,7 @@ services:
     env: java
     plan: starter
     buildCommand: mvn clean package -DskipTests
-    startCommand: java -jar -Dspring.profiles.active=prod target/sentinel-sdk-1.0.0.jar
+    startCommand: java $JAVA_OPTS -Dspring.profiles.active=prod -jar target/sentinel-sdk-2.1.0.jar
     healthCheckPath: /actuator/health
     autoDeploy: true
 
