@@ -1,0 +1,30 @@
+target/
+*.class
+*.jar
+!**/src/test/**/*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Generated output
+generated-tests/
+sentinel-generated-tests/
+
+# Env
+.env
+*.env.local
+application-local.properties
+
+# Docker
+docker/mysql/data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

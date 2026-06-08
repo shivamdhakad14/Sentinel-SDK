@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: sentinel-sdk
+    env: java
+    plan: starter
+    buildCommand: mvn clean package -DskipTests
+    startCommand: java -jar -Dspring.profiles.active=prod target/sentinel-sdk-1.0.0.jar
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false        # Set manually in Render dashboard
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sentinel-db
+          property: connectionString
+
+      - key: DATABASE_USERNAME
+        fromDatabase:
+          name: sentinel-db
+          property: user
+
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: sentinel-db
+          property: password
+
+      - key: GITHUB_TOKEN
+        sync: false
+
+      - key: GITHUB_OWNER
+        sync: false
+
+      - key: GITHUB_REPO
+        sync: false
+
+      - key: JAVA_OPTS
+        value: -Xmx512m -Xms256m
+
+      - key: PORT
+        value: 8090
+
+databases:
+  - name: sentinel-db
+    databaseName: sentinel_db
+    user: sentinel
+    plan: starter
+
+# Keep-alive cron job (prevents Render free tier from sleeping)
+# crons:
+#   - name: sentinel-keepalive
+#     schedule: "*/10 * * * *"
+#     command: curl -s https://your-sentinel.onrender.com/actuator/health

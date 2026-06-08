@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+
+  # ── Sentinel SDK Application ─────────────────────────────────────────────
+  sentinel:
+    build: .
+    container_name: sentinel-sdk
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:mysql://mysql:3306/sentinel_db?createDatabaseIfNotExist=true
+      DATABASE_USERNAME: sentinel
+      DATABASE_PASSWORD: sentinel_secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_OWNER: ${GITHUB_OWNER:-}
+      GITHUB_REPO: ${GITHUB_REPO:-}
+      JAVA_OPTS: -Xmx512m
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── MySQL Database ────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: sentinel-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: sentinel_db
+      MYSQL_USER: sentinel
+      MYSQL_PASSWORD: sentinel_secret
+    volumes:
+      - sentinel_mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "sentinel", "-psentinel_secret"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Optional: Demo Target API (a minimal Spring Boot app to scan) ─────────
+  demo-target:
+    image: mockserver/mockserver:latest
+    container_name: sentinel-demo-target
+    ports:
+      - "8080:1080"
+    environment:
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/mockserver.json
+    volumes:
+      - ./docker/mockserver:/config
+    profiles:
+      - demo
+
+volumes:
+  sentinel_mysql_data:
+    driver: local

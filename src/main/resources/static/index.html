@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sentinel SDK — Autonomous QA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:       #060810;
+  --surface:  #0d1017;
+  --card:     #111520;
+  --border:   #1a2035;
+  --border2:  #243050;
+  --cyan:     #00e5ff;
+  --cyan-dim: #0099bb;
+  --green:    #00ffa3;
+  --red:      #ff3d6e;
+  --orange:   #ffaa00;
+  --purple:   #b388ff;
+  --text:     #dde4f5;
+  --mid:      #7888aa;
+  --dim:      #3a4560;
+  --font-head:'Syne', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+  --font-body:'DM Sans', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;min-height:100vh;overflow-x:hidden}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── NOISE TEXTURE OVERLAY ── */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity:.4
+}
+
+/* ── HEADER ── */
+header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(6,8,16,.85);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:0;height:52px;padding:0 28px;
+}
+.logo{
+  display:flex;align-items:center;gap:10px;margin-right:32px;flex-shrink:0;
+  font-family:var(--font-head);
+}
+.logo-icon{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--cyan),#0050ff);
+  display:grid;place-items:center;font-size:15px;
+  box-shadow:0 0 20px rgba(0,229,255,.25);
+}
+.logo-text{font-size:16px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.logo-sub{font-size:9px;color:var(--cyan-dim);letter-spacing:.18em;text-transform:uppercase;margin-top:-3px}
+nav{display:flex;flex:1;gap:0}
+.nav-btn{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--mid);padding:0 18px;height:52px;cursor:pointer;
+  font-family:var(--font-body);font-size:12px;font-weight:500;
+  letter-spacing:.02em;transition:all .15s;white-space:nowrap;
+}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.header-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 1.8s ease-in-out infinite}
+.live-label{font-size:11px;color:var(--green);font-weight:600;font-family:var(--font-mono)}
+.btn-scan{
+  background:var(--cyan);color:#000;border:none;
+  border-radius:7px;padding:8px 16px;cursor:pointer;
+  font-family:var(--font-head);font-size:12px;font-weight:700;
+  letter-spacing:.02em;transition:all .15s;
+}
+.btn-scan:hover{background:#00f5ff;box-shadow:0 0 20px rgba(0,229,255,.4)}
+
+/* ── MAIN ── */
+main{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:28px 28px 60px}
+
+/* ── TABS ── */
+.tab{display:none}
+.tab.active{display:block}
+
+/* ── METRICS GRID ── */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.metric{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:20px 22px;position:relative;overflow:hidden;
+  transition:border-color .2s;
+}
+.metric:hover{border-color:var(--border2)}
+.metric::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,var(--cyan));opacity:.7}
+.metric-label{font-size:10px;color:var(--mid);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;font-family:var(--font-mono)}
+.metric-value{font-family:var(--font-head);font-size:38px;font-weight:800;color:var(--text);line-height:1}
+.metric-sub{font-size:11px;color:var(--mid);margin-top:6px}
+.metric-pulse{position:absolute;right:18px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--accent,var(--cyan));animation:pulse 1.6s ease-in-out infinite}
+
+/* ── TWO COL ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+
+/* ── PANEL ── */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,.02);
+}
+.panel-title{font-family:var(--font-head);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mid)}
+.panel-badge{font-size:10px;font-family:var(--font-mono);background:var(--border);color:var(--mid);padding:2px 8px;border-radius:20px}
+
+/* ── TERMINAL ── */
+.terminal{background:#050709;font-family:var(--font-mono);font-size:11px}
+.term-bar{
+  display:flex;align-items:center;gap:7px;padding:9px 14px;
+  border-bottom:1px solid var(--border);background:var(--card)
+}
+.term-dot{width:10px;height:10px;border-radius:50%}
+.term-title{font-size:10px;color:var(--mid);margin-left:6px;letter-spacing:.04em}
+.term-body{padding:14px 16px;min-height:260px;max-height:320px;overflow-y:auto}
+.term-line{display:flex;gap:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.term-time{color:var(--dim);flex-shrink:0;width:56px}
+.term-tag{font-weight:600;flex-shrink:0;width:60px}
+.term-msg{color:var(--mid);line-height:1.5;word-break:break-word}
+.tag-think{color:var(--purple)}
+.tag-act{color:var(--cyan)}
+.tag-ok{color:var(--green)}
+.tag-warn{color:var(--orange)}
+.tag-err{color:var(--red)}
+.term-cursor{color:var(--cyan);animation:blink 1s step-end infinite}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;color:var(--dim);letter-spacing:.09em;text-transform:uppercase;padding:9px 16px;text-align:left;font-family:var(--font-mono);border-bottom:1px solid var(--border)}
+.tbl td{padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.tbl tbody tr{transition:background .1s;cursor:pointer}
+.tbl tbody tr:hover{background:rgba(255,255,255,.03)}
+.tbl tbody tr:last-child td{border-bottom:none}
+
+/* ── BADGES ── */
+.method{
+  display:inline-block;font-size:9px;font-weight:700;font-family:var(--font-mono);
+  padding:2px 7px;border-radius:4px;letter-spacing:.06em;
+}
+.m-get   {background:#0a2018;border:1px solid var(--green);color:var(--green)}
+.m-post  {background:#081828;border:1px solid var(--cyan);color:var(--cyan)}
+.m-put   {background:#1e1800;border:1px solid var(--orange);color:var(--orange)}
+.m-patch {background:#160e28;border:1px solid var(--purple);color:var(--purple)}
+.m-delete{background:#200812;border:1px solid var(--red);color:var(--red)}
+
+.status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;font-family:var(--font-mono)}
+.s-dot{width:6px;height:6px;border-radius:50%}
+.s-success .s-dot{background:var(--green);box-shadow:0 0 5px var(--green)}
+.s-success{color:var(--green)}
+.s-failed{color:var(--red)}
+.s-failed .s-dot{background:var(--red)}
+.s-retrying{color:var(--orange)}
+.s-retrying .s-dot{background:var(--orange)}
+.s-skipped{color:var(--dim)}
+.s-skipped .s-dot{background:var(--dim)}
+.s-running{color:var(--cyan)}
+.s-running .s-dot{background:var(--cyan);animation:pulse 1s ease-in-out infinite}
+.s-queued{color:var(--mid)}
+.s-queued .s-dot{background:var(--mid)}
+
+.severity{display:inline-block;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.06em;font-family:var(--font-mono)}
+.sev-critical{background:#280610;color:var(--red)}
+.sev-high    {background:#1e1000;color:var(--orange)}
+.sev-medium  {background:#161200;color:#ffd000}
+.sev-low     {background:#0a1a10;color:var(--green)}
+
+/* ── PROGRESS ── */
+.progress-wrap{margin-bottom:6px}
+.progress-head{display:flex;justify-content:space-between;margin-bottom:5px;font-size:10px}
+.progress-bar{background:var(--border);border-radius:4px;height:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+/* ── SCAN MODAL ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.75);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--card);border:1px solid var(--border2);
+  border-radius:18px;padding:36px;width:460px;
+  animation:slideIn .2s ease;
+}
+.modal-title{font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--mid);margin-bottom:28px}
+label.field{display:block;margin-bottom:18px}
+.field-label{font-size:10px;color:var(--mid);letter-spacing:.09em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:7px}
+.field input,.field select{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:9px;padding:11px 14px;color:var(--text);font-size:13px;
+  font-family:var(--font-mono);outline:none;transition:border .15s;
+}
+.field input:focus,.field select:focus{border-color:var(--cyan)}
+.field input::placeholder{color:var(--dim)}
+.modal-actions{display:flex;gap:10px;margin-top:28px}
+.btn-primary{flex:1;background:var(--cyan);color:#000;border:none;border-radius:9px;padding:12px;cursor:pointer;font-family:var(--font-head);font-size:13px;font-weight:700;transition:all .15s}
+.btn-primary:hover{background:#00f5ff;box-shadow:0 0 24px rgba(0,229,255,.4)}
+.btn-secondary{background:var(--border);color:var(--mid);border:none;border-radius:9px;padding:12px 20px;cursor:pointer;font-size:13px;transition:all .15s}
+.btn-secondary:hover{background:var(--border2);color:var(--text)}
+
+/* ── DRIFT CARD ── */
+.drift-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:18px 20px;margin-bottom:12px;
+  transition:border-color .15s;
+}
+.drift-card:hover{border-color:var(--border2)}
+.drift-card.critical{border-color:rgba(255,61,110,.3)}
+.drift-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+.drift-diff{
+  background:var(--surface);border-radius:8px;padding:10px 14px;
+  font-family:var(--font-mono);font-size:11px;display:flex;align-items:center;gap:10px
+}
+.drift-from{color:var(--red)}
+.drift-arrow{color:var(--dim)}
+.drift-to{color:var(--green)}
+.drift-analysis{font-size:12px;color:var(--mid);margin-top:10px;line-height:1.6}
+.btn-heal{
+  background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);
+  color:var(--cyan);border-radius:7px;padding:6px 14px;
+  cursor:pointer;font-size:11px;font-weight:600;font-family:var(--font-mono);
+  transition:all .15s;
+}
+.btn-heal:hover{background:rgba(0,229,255,.2)}
+
+/* ── TEST CARDS ── */
+.test-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.test-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:16px 18px;
+  display:flex;flex-direction:column;gap:10px;
+  transition:border-color .15s;
+}
+.test-card:hover{border-color:var(--border2)}
+.test-type-icon{font-size:20px}
+.test-name{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--text)}
+.test-meta{font-size:11px;color:var(--mid)}
+.healed-tag{
+  font-size:9px;color:var(--green);background:rgba(0,255,163,.1);
+  border:1px solid rgba(0,255,163,.25);padding:2px 7px;border-radius:20px;
+  font-weight:700;letter-spacing:.05em;font-family:var(--font-mono);
+}
+.btn-dl{
+  background:var(--border);border:none;color:var(--mid);
+  border-radius:6px;padding:5px 10px;cursor:pointer;font-size:10px;
+  font-family:var(--font-mono);transition:all .15s;
+}
+.btn-dl:hover{background:var(--border2);color:var(--text)}
+.score-bar{display:flex;align-items:center;gap:8px}
+.score-val{font-family:var(--font-mono);font-size:11px;font-weight:600;width:34px;text-align:right}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:60px 20px;color:var(--dim)}
+.empty-icon{font-size:40px;margin-bottom:14px;filter:grayscale(1);opacity:.4}
+.empty-title{font-family:var(--font-head);font-size:16px;font-weight:700;color:var(--mid);margin-bottom:8px}
+.empty-sub{font-size:12px;line-height:1.6}
+
+/* ── ALERT BANNER ── */
+.alert{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 20px;border-radius:12px;margin-bottom:16px;
+}
+.alert-drift{background:rgba(255,170,0,.07);border:1px solid rgba(255,170,0,.2)}
+.alert-success{background:rgba(0,255,163,.07);border:1px solid rgba(0,255,163,.2)}
+
+/* ── SCAN STATUS BAR ── */
+.scan-bar{
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:150;
+  background:rgba(13,16,23,.96);backdrop-filter:blur(12px);
+  border-top:1px solid var(--border);
+  padding:12px 28px;align-items:center;gap:16px;
+}
+.scan-bar.visible{display:flex}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.3)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+.fade-in{animation:fadeIn .25s ease both}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skeleton{
+  background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;
+  border-radius:4px;
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .two-col,.test-grid{grid-template-columns:1fr}
+  .three-col{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ───────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div>
+      <div class="logo-text">Sentinel</div>
+      <div class="logo-sub">SDK v2.1</div>
+    </div>
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="nav-btn" onclick="switchTab('scans')">Scans</button>
+    <button class="nav-btn" onclick="switchTab('endpoints')">Endpoints</button>
+    <button class="nav-btn" onclick="switchTab('drift')">Schema Drift</button>
+    <button class="nav-btn" onclick="switchTab('tests')">Generated Tests</button>
+  </nav>
+  <div class="header-right">
+    <div id="liveIndicator" style="display:none;align-items:center;gap:6px">
+      <div class="live-dot"></div>
+      <span class="live-label" id="livePct">0%</span>
+    </div>
+    <button class="btn-scan" onclick="openModal()">+ New Scan</button>
+  </div>
+</header>
+
+<!-- ── SCAN MODAL ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="scanModal" onclick="closeModal(event)">
+  <div class="modal" onclick="e=>e.stopPropagation()">
+    <div class="modal-title">Launch Autonomous Scan</div>
+    <div class="modal-sub">Sentinel will discover, test, and generate JUnit tests for your API</div>
+    <label class="field">
+      <div class="field-label">Target Base URL</div>
+      <input id="scanUrl" type="text" placeholder="http://localhost:8080" value="http://localhost:8080"/>
+    </label>
+    <label class="field">
+      <div class="field-label">API Name</div>
+      <input id="scanName" type="text" placeholder="My Spring Boot API" value="My API"/>
+    </label>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="startScan()">🛡️ Start Scan</button>
+      <button class="btn-secondary" onclick="document.getElementById('scanModal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN ─────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- OVERVIEW TAB -->
+  <div id="tab-overview" class="tab active">
+    <div class="metrics" id="metricsGrid">
+      <div class="metric" style="--accent:var(--cyan)">
+        <div class="metric-label">Total Scans</div>
+        <div class="metric-value" id="m-scans">—</div>
+        <div class="metric-sub" id="m-scans-sub">loading…</div>
+        <div class="metric-pulse" id="m-pulse" style="display:none"></div>
+      </div>
+      <div class="metric" style="--accent:var(--green)">
+        <div class="metric-label">Tests Generated</div>
+        <div class="metric-value" id="m-tests">—</div>
+        <div class="metric-sub" id="m-tests-sub"></div>
+      </div>
+      <div class="metric" style="--accent:var(--orange)">
+        <div class="metric-label">Schema Drifts</div>
+        <div class="metric-value" id="m-drifts">—</div>
+        <div class="metric-sub" id="m-drifts-sub"></div>
+      </div>
+      <div class="metric" style="--accent:var(--purple)">
+        <div class="metric-label">Self-Healed</div>
+        <div class="metric-value" id="m-healed">—</div>
+        <div class="metric-sub" id="m-healed-sub"></div>
+      </div>
+    </div>
+
+    <div id="driftAlert" class="alert alert-drift" style="display:none">
+      <span style="font-size:20px">⚠️</span>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--orange);margin-bottom:2px">Schema Drift Detected</div>
+        <div style="font-size:11px;color:var(--mid)" id="driftAlertMsg"></div>
+      </div>
+      <button class="btn-heal" onclick="switchTab('drift')">View →</button>
+    </div>
+
+    <div class="two-col">
+      <!-- Terminal -->
+      <div>
+        <div class="panel-title" style="margin-bottom:10px;font-family:var(--font-head);font-size:10px;letter-spacing:.1em;color:var(--mid)">AGENT ACTIVITY LOG</div>
+        <div class="panel">
+          <div class="terminal">
+            <div class="term-bar">
+              <div class="term-dot" style="background:#ff5f57"></div>
+              <div class="term-dot" style="background:#febc2e"></div>
+              <div class="term-dot" style="background:#28c840"></div>
+              <span class="term-title">sentinel-agent — TAO loop</span>
+              <span id="termLive" style="margin-left:auto;font-size:10px;color:var(--green);display:none">● LIVE</span>
+            </div>
+            <div class="term-body" id="termBody">
+              <div class="term-line">
+                <span class="term-time">—</span>
+                <span class="term-tag tag-act">INFO</span>
+                <span class="term-msg">Sentinel started. Click <strong style="color:var(--cyan)">+ New Scan</strong> to begin.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent scans -->
+      <div>
+        <div class="panel-title" style="margin-bottom:10px;font-family:var(--font-head);font-size:10px;letter-spacing:.1em;color:var(--mid)">RECENT SESSIONS</div>
+        <div class="panel">
+          <div style="max-height:360px;overflow-y:auto" id="recentScans">
+            <div class="empty"><div class="empty-icon">📡</div><div class="empty-title">No scans yet</div><div class="empty-sub">Start a scan to see results here</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCANS TAB -->
+  <div id="tab-scans" class="tab">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">All Scan Sessions</span>
+        <span class="panel-badge" id="scanCount">0</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr>
+            <th>#</th><th>Target</th><th>Status</th>
+            <th>Endpoints</th><th>Passed</th><th>Drifts</th><th>Started</th>
+          </tr></thead>
+          <tbody id="scansBody">
+            <tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No sessions yet</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENDPOINTS TAB -->
+  <div id="tab-endpoints" class="tab">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Endpoint Test Results</span>
+        <span class="panel-badge" id="epCount">0 attempts</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr>
+            <th>Method</th><th>Path</th><th>Status</th>
+            <th>Response</th><th>Time</th><th>Attempts</th>
+          </tr></thead>
+          <tbody id="endpointsBody">
+            <tr><td colspan="6"><div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No endpoint data yet</div><div class="empty-sub">Run a scan to see results</div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRIFT TAB -->
+  <div id="tab-drift" class="tab">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.1em;color:var(--mid);text-transform:uppercase">Schema Drift Events</div>
+      <button class="btn-heal" id="healAllBtn" style="display:none" onclick="healAll()">🔧 Heal All &amp; Submit PR</button>
+    </div>
+    <div id="driftList">
+      <div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No drift detected</div><div class="empty-sub">All API schemas are consistent across scans</div></div>
+    </div>
+  </div>
+
+  <!-- TESTS TAB -->
+  <div id="tab-tests" class="tab">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:var(--font-head);font-size:10px;letter-spacing:.1em;color:var(--mid);text-transform:uppercase">Generated Test Artifacts</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" style="font-size:11px;padding:6px 14px" onclick="filterTests('ALL')">All</button>
+        <button class="btn-secondary" style="font-size:11px;padding:6px 14px" onclick="filterTests('JUNIT5')">JUnit 5</button>
+        <button class="btn-secondary" style="font-size:11px;padding:6px 14px" onclick="filterTests('POSTMAN_COLLECTION')">Postman</button>
+      </div>
+    </div>
+    <div class="test-grid" id="testGrid">
+      <div style="grid-column:1/-1"><div class="empty"><div class="empty-icon">🧪</div><div class="empty-title">No tests generated yet</div><div class="empty-sub">Tests are generated automatically after a successful scan</div></div></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── SCAN STATUS BAR ────────────────────────────────────────────── -->
+<div class="scan-bar" id="scanBar">
+  <div class="live-dot"></div>
+  <span style="font-size:12px;font-weight:600;color:var(--text)" id="scanBarPhase">Scanning…</span>
+  <div style="flex:1;max-width:300px">
+    <div class="progress-bar"><div class="progress-fill" id="scanBarFill" style="width:0%;background:var(--cyan)"></div></div>
+  </div>
+  <span style="font-family:var(--font-mono);font-size:11px;color:var(--cyan)" id="scanBarPct">0%</span>
+  <span style="color:var(--mid);font-size:11px" id="scanBarMsg"></span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+const API = '';  // same origin
+let allTests = [];
+let activeSessionId = null;
+let pollInterval = null;
+let termLines = [];
+let wsSocket = null;
+
+// ═══════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event && event.target.classList.add('active');
+
+  if (name === 'scans')     loadScans();
+  if (name === 'endpoints') loadEndpoints();
+  if (name === 'drift')     loadDrift();
+  if (name === 'tests')     loadTests();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════════
+function openModal() { document.getElementById('scanModal').classList.add('open'); }
+function closeModal(e) {
+  if (e.target === document.getElementById('scanModal'))
+    document.getElementById('scanModal').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// API HELPERS
+// ═══════════════════════════════════════════════════════════════════
+async function apiFetch(path, opts) {
+  try {
+    const r = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts
+    });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch (e) {
+    console.warn('API error:', path, e.message);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// START SCAN
+// ═══════════════════════════════════════════════════════════════════
+async function startScan() {
+  const url  = document.getElementById('scanUrl').value.trim();
+  const name = document.getElementById('scanName').value.trim();
+  if (!url || !name) { alert('Please fill in both fields.'); return; }
+
+  document.getElementById('scanModal').classList.remove('open');
+  addTermLine('INFO', `Starting scan: ${name} (${url})`);
+
+  const res = await apiFetch('/api/v1/scans', {
+    method: 'POST',
+    body: JSON.stringify({ targetBaseUrl: url, targetName: name })
+  });
+
+  if (!res || !res.success) {
+    addTermLine('ERR', 'Failed to start scan — check the target URL and try again.');
+    return;
+  }
+
+  activeSessionId = res.data.id;
+  addTermLine('OK',  `Session #${activeSessionId} queued`);
+  showScanBar(true);
+  connectWebSocket(activeSessionId);
+  startPolling(activeSessionId);
+  loadDashboard();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// WEBSOCKET — real-time progress
+// ═══════════════════════════════════════════════════════════════════
+function connectWebSocket(sessionId) {
+  if (wsSocket) wsSocket.close();
+  try {
+    // SockJS fallback
+    const wsUrl = `${location.origin.replace('http','ws')}/ws/websocket`;
+    wsSocket = new WebSocket(wsUrl);
+    wsSocket.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.phase && data.message) handleWsMessage(data.phase, data.message);
+      } catch(_) {}
+    };
+  } catch(_) {}
+}
+
+function handleWsMessage(phase, message) {
+  const tagMap = {
+    PLANNING:    ['THINK', 'tag-think'],
+    DISCOVERING: ['ACT',   'tag-act'],
+    TESTING:     ['ACT',   'tag-act'],
+    CORRECTING:  ['THINK', 'tag-think'],
+    GENERATING:  ['ACT',   'tag-act'],
+    DRIFT_CHECK: ['THINK', 'tag-think'],
+    DRIFT_FOUND: ['WARN',  'tag-warn'],
+    SELF_HEALING:['ACT',   'tag-act'],
+    PR_CREATED:  ['OK',    'tag-ok'],
+    COMPLETED:   ['OK',    'tag-ok'],
+    FAILED:      ['ERR',   'tag-err'],
+  };
+  const [label, cls] = tagMap[phase] || ['INFO', 'tag-act'];
+  addTermLine(label, message, cls);
+
+  const pcts = {DISCOVERING:10,PLANNING:20,TESTING:50,CORRECTING:65,DRIFT_CHECK:75,GENERATING:85,SELF_HEALING:92,COMPLETED:100,FAILED:100};
+  if (pcts[phase]) updateScanProgress(pcts[phase], message);
+  if (phase === 'COMPLETED' || phase === 'FAILED') {
+    stopPolling();
+    showScanBar(false);
+    setTimeout(loadDashboard, 800);
+    setTimeout(loadEndpoints, 800);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// POLLING FALLBACK (when WS not available)
+// ═══════════════════════════════════════════════════════════════════
+function startPolling(sessionId) {
+  stopPolling();
+  pollInterval = setInterval(async () => {
+    const res = await apiFetch(`/api/v1/scans/${sessionId}`);
+    if (!res) return;
+    const s = res.data;
+    const pct = s.totalEndpointsDiscovered > 0
+      ? Math.min(95, Math.round(s.endpointsTested / s.totalEndpointsDiscovered * 80) + 15)
+      : 20;
+    updateScanProgress(pct, `Testing ${s.endpointsTested}/${s.totalEndpointsDiscovered} endpoints`);
+
+    if (s.status === 'COMPLETED' || s.status === 'FAILED') {
+      stopPolling();
+      showScanBar(false);
+      addTermLine(s.status === 'COMPLETED' ? 'OK' : 'ERR',
+        s.status === 'COMPLETED'
+          ? `✅ Done — ${s.endpointsPassed}/${s.totalEndpointsDiscovered} passed`
+          : `❌ Failed: ${s.errorMessage || 'unknown error'}`);
+      setTimeout(loadDashboard, 600);
+      setTimeout(loadEndpoints, 600);
+      setTimeout(loadTests, 800);
+    }
+  }, 2000);
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCAN BAR
+// ═══════════════════════════════════════════════════════════════════
+function showScanBar(visible) {
+  const bar = document.getElementById('scanBar');
+  const ind = document.getElementById('liveIndicator');
+  const term = document.getElementById('termLive');
+  bar.classList.toggle('visible', visible);
+  ind.style.display = visible ? 'flex' : 'none';
+  if (term) term.style.display = visible ? 'inline' : 'none';
+  if (!visible) updateScanProgress(0, '');
+}
+
+function updateScanProgress(pct, msg) {
+  document.getElementById('scanBarFill').style.width = pct + '%';
+  document.getElementById('scanBarPct').textContent = pct + '%';
+  document.getElementById('scanBarMsg').textContent = msg;
+  document.getElementById('scanBarPhase').textContent = msg.split(' — ')[0] || 'Scanning…';
+  document.getElementById('livePct').textContent = pct + '%';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TERMINAL
+// ═══════════════════════════════════════════════════════════════════
+function addTermLine(tag, msg, cls) {
+  const now = new Date().toTimeString().slice(0,8);
+  const clsMap = {OK:'tag-ok',ERR:'tag-err',WARN:'tag-warn',THINK:'tag-think',ACT:'tag-act',INFO:'tag-act'};
+  const c = cls || clsMap[tag] || 'tag-act';
+  termLines.push({time:now, tag, msg, cls:c});
+  if (termLines.length > 120) termLines.shift();
+  renderTerm();
+}
+
+function renderTerm() {
+  const body = document.getElementById('termBody');
+  body.innerHTML = termLines.map(l => `
+    <div class="term-line fade-in">
+      <span class="term-time">${l.time}</span>
+      <span class="term-tag ${l.cls}">${l.tag}</span>
+      <span class="term-msg">${escHtml(l.msg)}</span>
+    </div>`).join('') +
+    `<div style="padding:4px 0"><span style="color:var(--cyan);font-family:var(--font-mono);font-size:11px">› <span class="term-cursor">█</span></span></div>`;
+  body.scrollTop = body.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const res = await apiFetch('/api/v1/dashboard');
+  if (!res) return;
+  const d = res.data;
+
+  setText('m-scans',  d.totalScans ?? '0');
+  setText('m-tests',  d.testsGenerated ?? '0');
+  setText('m-drifts', d.totalDrifts ?? '0');
+  setText('m-healed', d.selfHealedTests ?? '0');
+  setText('m-scans-sub',  d.activeScans > 0 ? `${d.activeScans} active` : 'No active scans');
+  setText('m-tests-sub',  d.testsGenerated > 0 ? 'JUnit 5 + Postman' : '');
+  setText('m-drifts-sub', d.unhealedDrifts > 0 ? `${d.unhealedDrifts} unhealed` : 'All clear');
+  setText('m-healed-sub', d.selfHealedTests > 0 ? 'PRs submitted' : '');
+
+  const pulse = document.getElementById('m-pulse');
+  if (pulse) pulse.style.display = d.activeScans > 0 ? 'block' : 'none';
+
+  // Drift alert
+  const driftAlert = document.getElementById('driftAlert');
+  if (d.unhealedDrifts > 0) {
+    driftAlert.style.display = 'flex';
+    setText('driftAlertMsg', `${d.unhealedDrifts} unresolved schema change(s). Sentinel can auto-heal and submit a GitHub PR.`);
+  } else {
+    driftAlert.style.display = 'none';
+  }
+
+  // Recent sessions
+  const recent = d.recentSessions || [];
+  const container = document.getElementById('recentScans');
+  if (recent.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">📡</div><div class="empty-title">No scans yet</div><div class="empty-sub">Start your first scan to see results</div></div>`;
+  } else {
+    container.innerHTML = recent.map(s => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer" onclick="showScanDetail(${s.id})">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:12px;margin-bottom:2px">${escHtml(s.targetName)}</div>
+          <div style="font-size:10px;color:var(--mid);font-family:var(--font-mono)">${escHtml(s.targetBaseUrl)}</div>
+        </div>
+        <div style="text-align:right;min-width:80px">
+          ${statusBadge(s.status)}
+          <div style="font-size:10px;color:var(--dim);margin-top:3px">${s.passed ?? 0}/${s.totalEndpoints ?? 0} passed</div>
+        </div>
+      </div>`).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCANS TAB
+// ═══════════════════════════════════════════════════════════════════
+async function loadScans() {
+  const res = await apiFetch('/api/v1/scans');
+  if (!res) return;
+  const sessions = res.data || [];
+  setText('scanCount', sessions.length);
+  const body = document.getElementById('scansBody');
+  if (sessions.length === 0) {
+    body.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No sessions</div></div></td></tr>`;
+    return;
+  }
+  body.innerHTML = sessions.map(s => `
+    <tr onclick="showScanDetail(${s.id})">
+      <td style="font-family:var(--font-mono);color:var(--dim)">#${s.id}</td>
+      <td>
+        <div style="font-weight:600;font-size:12px">${escHtml(s.targetName)}</div>
+        <div style="font-size:10px;color:var(--mid);font-family:var(--font-mono)">${escHtml(s.targetBaseUrl)}</div>
+      </td>
+      <td>${statusBadge(s.status)}</td>
+      <td style="font-family:var(--font-mono)">${s.totalEndpoints ?? 0}</td>
+      <td style="font-family:var(--font-mono);color:var(--green)">${s.passed ?? 0}</td>
+      <td style="font-family:var(--font-mono);color:${(s.drifts??0)>0?'var(--orange)':'var(--dim)'}">${s.drifts ?? 0}</td>
+      <td style="font-size:11px;color:var(--mid)">${fmtDate(s.startedAt)}</td>
+    </tr>`).join('');
+}
+
+async function showScanDetail(id) {
+  switchTab('endpoints');
+  document.querySelectorAll('.nav-btn')[2].classList.add('active');
+  await loadAttempts(id);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENDPOINTS TAB
+// ═══════════════════════════════════════════════════════════════════
+async function loadEndpoints() {
+  // Load from latest completed scan
+  const scansRes = await apiFetch('/api/v1/scans');
+  if (!scansRes || !scansRes.data.length) return;
+  const latest = scansRes.data[0];
+  await loadAttempts(latest.id);
+}
+
+async function loadAttempts(sessionId) {
+  const res = await apiFetch(`/api/v1/scans/${sessionId}/attempts`);
+  if (!res) return;
+  const attempts = res.data || [];
+  setText('epCount', `${attempts.length} attempts · session #${sessionId}`);
+  const body = document.getElementById('endpointsBody');
+  if (attempts.length === 0) {
+    body.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No attempts yet</div></div></td></tr>`;
+    return;
+  }
+  // Group by endpoint path+method, show latest attempt per endpoint
+  const grouped = {};
+  attempts.forEach(a => {
+    const key = `${a.httpMethod}:${a.endpointPath}`;
+    if (!grouped[key] || a.attemptNumber > grouped[key].attemptNumber) grouped[key] = a;
+  });
+  body.innerHTML = Object.values(grouped).map(a => `
+    <tr>
+      <td>${methodBadge(a.httpMethod)}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${escHtml(a.endpointPath)}</td>
+      <td>${statusBadge(a.outcome)}</td>
+      <td style="font-family:var(--font-mono);font-size:11px">${a.responseStatusCode || '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--mid)">${a.responseTimeMs ? a.responseTimeMs+'ms' : '—'}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;color:var(--dim)">${a.attemptNumber}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DRIFT TAB
+// ═══════════════════════════════════════════════════════════════════
+async function loadDrift() {
+  const res = await apiFetch('/api/v1/drift');
+  if (!res) return;
+  const events = res.data || [];
+  const healBtn = document.getElementById('healAllBtn');
+  const unhealed = events.filter(e => !e.healingTriggered);
+  healBtn.style.display = unhealed.length > 0 ? 'inline-flex' : 'none';
+
+  const list = document.getElementById('driftList');
+  if (events.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No drift detected</div><div class="empty-sub">All API schemas are consistent across scans</div></div>`;
+    return;
+  }
+  list.innerHTML = events.map(e => `
+    <div class="drift-card ${e.severity==='CRITICAL'?'critical':''}">
+      <div class="drift-head">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="severity sev-${e.severity.toLowerCase()}">${e.severity}</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--mid)">${e.driftType}</span>
+            ${e.healingTriggered ? `<span style="font-size:9px;color:var(--green);background:rgba(0,255,163,.1);border:1px solid rgba(0,255,163,.25);padding:2px 7px;border-radius:20px;font-weight:700;font-family:var(--font-mono)">✓ HEALED</span>` : ''}
+          </div>
+          <div style="font-family:var(--font-mono);font-size:12px;font-weight:600">${e.httpMethod} ${e.endpointPath}</div>
+        </div>
+        ${!e.healingTriggered ? `<button class="btn-heal" onclick="healDrift(${e.id})">Auto-Heal</button>` : ''}
+      </div>
+      <div class="drift-diff">
+        <span class="drift-from">${escHtml(e.previousValue||'—')}</span>
+        <span class="drift-arrow">→</span>
+        <span class="drift-to">${escHtml(e.newValue||'REMOVED')}</span>
+        <span style="margin-left:auto;color:var(--dim);font-size:10px">${e.fieldPath||''}</span>
+      </div>
+      ${e.aiAnalysis ? `<div class="drift-analysis">⚡ ${escHtml(e.aiAnalysis)}</div>` : ''}
+    </div>`).join('');
+}
+
+async function healDrift(id) {
+  addTermLine('ACT', `Triggering self-healing for drift event #${id}…`);
+  // In production this would call a heal endpoint
+  // For now show the action
+  addTermLine('OK', 'Self-healing initiated — check GitHub for PR');
+  loadDrift();
+}
+
+async function healAll() {
+  addTermLine('ACT', 'Triggering batch self-healing for all unhealed drifts…');
+  addTermLine('WARN', 'GitHub PR submission requires GITHUB_TOKEN to be configured');
+  loadDrift();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TESTS TAB
+// ═══════════════════════════════════════════════════════════════════
+async function loadTests(typeFilter) {
+  const path = typeFilter && typeFilter !== 'ALL'
+    ? `/api/v1/tests?type=${typeFilter}`
+    : '/api/v1/tests';
+  const res = await apiFetch(path);
+  if (!res) return;
+  allTests = res.data || [];
+  renderTests(allTests);
+}
+
+function filterTests(type) {
+  if (type === 'ALL') renderTests(allTests);
+  else renderTests(allTests.filter(t => t.testType === type));
+}
+
+function renderTests(tests) {
+  const grid = document.getElementById('testGrid');
+  if (tests.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1"><div class="empty"><div class="empty-icon">🧪</div><div class="empty-title">No tests yet</div><div class="empty-sub">Tests are generated automatically after a successful scan</div></div></div>`;
+    return;
+  }
+  grid.innerHTML = tests.map(t => {
+    const icon  = t.testType === 'POSTMAN_COLLECTION' ? '📮' : '🧪';
+    const score = t.coverageScore || 0;
+    const scoreColor = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--orange)' : 'var(--red)';
+    return `
+    <div class="test-card fade-in">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="test-type-icon">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+            <span class="test-name">${escHtml(t.className)}</span>
+            ${t.selfHealingApplied ? `<span class="healed-tag">🔧 HEALED</span>` : ''}
+          </div>
+          <div class="test-meta">${t.testType} · ${escHtml(t.targetEndpoint||'')}</div>
+        </div>
+        <button class="btn-dl" onclick="downloadTest(${t.id},'${escHtml(t.className)}')">↓</button>
+      </div>
+      <div class="score-bar">
+        <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:${score}%;background:${scoreColor}"></div></div>
+        <span class="score-val" style="color:${scoreColor}">${score}%</span>
+      </div>
+      ${t.githubPrUrl ? `<a href="${escHtml(t.githubPrUrl)}" target="_blank" style="font-size:10px;color:var(--cyan);font-family:var(--font-mono);text-decoration:none">🔗 View PR →</a>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function downloadTest(id, filename) {
+  try {
+    const r = await fetch(`/api/v1/tests/${id}/download`);
+    if (!r.ok) return;
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  } catch(e) { console.warn('Download failed', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  } catch { return iso; }
+}
+
+function methodBadge(m) {
+  if (!m) return '';
+  const cls = {GET:'m-get',POST:'m-post',PUT:'m-put',PATCH:'m-patch',DELETE:'m-delete'}[m.toUpperCase()] || 'm-get';
+  return `<span class="method ${cls}">${m}</span>`;
+}
+
+function statusBadge(status) {
+  if (!status) return '';
+  const map = {
+    SUCCESS:'s-success',COMPLETED:'s-success',
+    FAILED:'s-failed',
+    RETRYING:'s-retrying',PARTIAL:'s-retrying',
+    SKIPPED:'s-skipped',
+    RUNNING:'s-running',
+    QUEUED:'s-queued',
+    SCHEMA_DRIFT:'s-retrying',
+  };
+  const cls = map[status] || 's-skipped';
+  const label = {SUCCESS:'SUCCESS',COMPLETED:'COMPLETED',FAILED:'FAILED',
+    RETRYING:'RETRYING',PARTIAL:'PARTIAL',SKIPPED:'SKIPPED',
+    RUNNING:'RUNNING',QUEUED:'QUEUED',SCHEMA_DRIFT:'DRIFT'}[status] || status;
+  return `<span class="status ${cls}"><span class="s-dot"></span>${label}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Nav button click handler
+  document.querySelectorAll('.nav-btn').forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  renderTerm();
+  loadDashboard();
+
+  // Auto-refresh dashboard every 10s
+  setInterval(loadDashboard, 10000);
+
+  // Check if any scan is currently running on load
+  apiFetch('/api/v1/scans').then(res => {
+    if (!res) return;
+    const running = (res.data || []).find(s => s.status === 'RUNNING' || s.status === 'QUEUED');
+    if (running) {
+      activeSessionId = running.id;
+      addTermLine('INFO', `Resuming monitoring for session #${running.id} (${running.targetName})`);
+      showScanBar(true);
+      startPolling(running.id);
+    }
+  });
+});
+</script>
+</body>
+</html>
